@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-hacknotice",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Developer Tools"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://documenter.getpostman.com/view/806684/RWaHzA6C"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://documenter.getpostman.com/view/806684/RWaHzA6C"
+			}
+		]
+	}
+}
