@@ -1,46 +1,46 @@
 import type { INodeProperties } from 'n8n-workflow';
 
 /**
- * Third Party Alerts resource.
+ * First Party Alerts resource.
  * API reference: https://documenter.getpostman.com/view/806684/RWaHzA6C#ff61c168-022f-448e-8f0e-2be95a7466b4
  */
-const showOnlyForThirdPartyAlerts = {
-	resource: ['thirdPartyAlerts'],
+const showOnlyForFirstPartyAlerts = {
+	resource: ['firstPartyAlerts'],
 };
 
-export const thirdPartyAlertsDescription: INodeProperties[] = [
+export const firstPartyAlertsDescription: INodeProperties[] = [
 	{
 		displayName: 'Operation',
 		name: 'operation',
 		type: 'options',
 		noDataExpression: true,
 		displayOptions: {
-			show: showOnlyForThirdPartyAlerts,
+			show: showOnlyForFirstPartyAlerts,
 		},
 		options: [
 			{
-				name: 'Get Many Third Party Alerts',
+				name: 'Get Many First Party Alerts',
 				value: 'getAll',
-				action: 'Get third party alerts',
-				description: 'Get third party alerts from the HackNotice API',
+				action: 'Get first party alerts',
+				description: 'Get first party alerts from the HackNotice API',
 				routing: {
 					request: {
 						method: 'POST',
-						url: '/hackalerts/page/0',
+						url: '/domainalerts/page/0',
 						// Merge saved search filters (search object) into request body.
-						body: '={{ $parameter["thirdPartySavedSearchId"] && $parameter["thirdPartySavedSearchId"] !== "" ? JSON.parse($parameter["thirdPartySavedSearchId"]) : {} }}',
+						body: '={{ $parameter["savedSearchId"] && $parameter["savedSearchId"] !== "" ? JSON.parse($parameter["savedSearchId"]) : {} }}',
 					},
 				},
 			},
 			// {
 			// 	name: 'Get Saved Searches',
 			// 	value: 'getSavedSearches',
-			// 	action: 'Get third party saved searches',
-			// 	description: 'Get third party saved searches from the HackNotice API',
+			// 	action: 'Get first party saved searches',
+			// 	description: 'Get first party saved searches from the HackNotice API',
 			// 	routing: {
 			// 		request: {
 			// 			method: 'GET',
-			// 			url: '/hackalertsavedsearch/page/0',
+			// 			url: '/domainalertsavedsearch/page/0',
 			// 		},
 			// 	},
 			// },
@@ -49,7 +49,7 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 	},
 	{
 		displayName: 'Saved Search Name or ID',
-		name: 'thirdPartySavedSearchId',
+		name: 'savedSearchId',
 		type: 'options',
 		default: '',
 		options: [
@@ -61,11 +61,11 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 		description:
 			'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 		typeOptions: {
-			loadOptionsMethod: 'getThirdPartySavedSearches',
+			loadOptionsMethod: 'getFirstPartySavedSearches',
 		},
 		displayOptions: {
 			show: {
-				resource: ['thirdPartyAlerts'],
+				resource: ['firstPartyAlerts'],
 				operation: ['getAll'],
 			},
 		},
