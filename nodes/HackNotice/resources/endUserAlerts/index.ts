@@ -20,8 +20,8 @@ export const endUserAlertsDescription: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Get Many End User Alerts',
-				value: 'getAll',
+				name: 'Get End User Alerts',
+				value: 'getEndUserAlerts',
 				action: 'Get end user alerts',
 				description: 'Get end user alerts from the HackNotice API',
 				routing: {
@@ -33,7 +33,7 @@ export const endUserAlertsDescription: INodeProperties[] = [
 				},
 			},
 		],
-		default: 'getAll',
+		default: 'getEndUserAlerts',
 	},
 	{
 		displayName: 'Saved Search Name or ID',
@@ -54,7 +54,35 @@ export const endUserAlertsDescription: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['endUserAlerts'],
-				operation: ['getAll'],
+				operation: ['getEndUserAlerts'],
+			},
+		},
+	},
+	{
+		displayName: 'Limit By Time',
+		name: 'timeRange',
+		type: 'options',
+		default: 'lastDay',
+		options: [
+			{
+				name: 'Last Day',
+				value: 'lastDay',
+			},
+			{
+				name: 'Last Week',
+				value: 'lastWeek',
+			},
+			{
+				name: 'Last Month',
+				value: 'lastMonth',
+			},
+		],
+		description:
+			'**Last Day** sends `hours_ago: 24`. **Last Week** / **Last Month** send `start_date` (today minus 7 days or 1 month). Time fields from the saved search are not used.',
+		displayOptions: {
+			show: {
+				resource: ['endUserAlerts'],
+				operation: ['getEndUserAlerts'],
 			},
 		},
 	},

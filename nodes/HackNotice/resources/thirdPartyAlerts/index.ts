@@ -19,8 +19,8 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Get Many Third Party Alerts',
-				value: 'getAll',
+				name: 'Get Third Party Alerts',
+				value: 'getThirdPartyAlerts',
 				action: 'Get third party alerts',
 				description: 'Get third party alerts from the HackNotice API',
 				routing: {
@@ -45,7 +45,7 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 			// 	},
 			// },
 		],
-		default: 'getAll',
+		default: 'getThirdPartyAlerts',
 	},
 	{
 		displayName: 'Saved Search Name or ID',
@@ -66,31 +66,36 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['thirdPartyAlerts'],
-				operation: ['getAll'],
+				operation: ['getThirdPartyAlerts'],
 			},
 		},
 	},
-	// {
-	// 	displayName: 'Tier Name or ID',
-	// 	name: 'tierId',
-	// 	type: 'options',
-	// 	default: 'none',
-	// 	options: [
-	// 		{
-	// 			name: 'No Tier',
-	// 			value: 'none',
-	// 		},
-	// 	],
-	// 	description:
-	// 		'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-	// 	typeOptions: {
-	// 		loadOptionsMethod: 'getTiers',
-	// 	},
-	// 	displayOptions: {
-	// 		show: {
-	// 			resource: ['thirdPartyAlerts'],
-	// 			operation: ['getAll'],
-	// 		},
-	// 	},
-	// },
+	{
+		displayName: 'Limit By Time',
+		name: 'timeRange',
+		type: 'options',
+		default: 'lastDay',
+		options: [
+			{
+				name: 'Last Day',
+				value: 'lastDay',
+			},
+			{
+				name: 'Last Week',
+				value: 'lastWeek',
+			},
+			{
+				name: 'Last Month',
+				value: 'lastMonth',
+			},
+		],
+		description:
+			'**Last Day** sends `hours_ago: 24`. **Last Week** / **Last Month** send `start_date` (today minus 7 days or 1 month). Time fields from the saved search are not used.',
+		displayOptions: {
+			show: {
+				resource: ['thirdPartyAlerts'],
+				operation: ['getThirdPartyAlerts'],
+			},
+		},
+	},
 ];
