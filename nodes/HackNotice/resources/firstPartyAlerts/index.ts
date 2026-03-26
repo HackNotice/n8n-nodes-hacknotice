@@ -20,7 +20,7 @@ export const firstPartyAlertsDescription: INodeProperties[] = [
 		options: [
 			{
 				name: 'Get Many First Party Alerts',
-				value: 'getAll',
+				value: 'getFirstPartyAlerts',
 				action: 'Get first party alerts',
 				description: 'Get first party alerts from the HackNotice API',
 				routing: {
@@ -32,7 +32,7 @@ export const firstPartyAlertsDescription: INodeProperties[] = [
 				},
 			},
 		],
-		default: 'getAll',
+		default: 'getFirstPartyAlerts',
 	},
 	{
 		displayName: 'Saved Search Name or ID',
@@ -53,7 +53,35 @@ export const firstPartyAlertsDescription: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['firstPartyAlerts'],
-				operation: ['getAll'],
+				operation: ['getFirstPartyAlerts'],
+			},
+		},
+	},
+	{
+		displayName: 'Limit By Time',
+		name: 'timeRange',
+		type: 'options',
+		default: 'lastDay',
+		options: [
+			{
+				name: 'Last Day',
+				value: 'lastDay',
+			},
+			{
+				name: 'Last Week',
+				value: 'lastWeek',
+			},
+			{
+				name: 'Last Month',
+				value: 'lastMonth',
+			},
+		],
+		description:
+			'**Last Day** sends `hours_ago: 24`. **Last Week** / **Last Month** send `start_date` (today minus 7 days or 1 month). Time fields from the saved search are not used.',
+		displayOptions: {
+			show: {
+				resource: ['firstPartyAlerts'],
+				operation: ['getFirstPartyAlerts'],
 			},
 		},
 	},

@@ -15,16 +15,19 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ## Credentials
 
-Use the **HackNotice API** credential with one of two authentication methods:
+Use the **HackNotice API** credential.
 
 ### API Key
 - **API Key** – Your HackNotice API key.
 - **API Base URL** – Optional; defaults to `https://api.hacknotice.com`.
 
-### Email & Password
+### Email & Password (used to obtain JWT)
 - **Email** – Your HackNotice account email.
 - **Password** – Your HackNotice account password.
-- **API Base URL** – Base URL used for sign-in (`POST {API Base URL}/auth/sign_in`) and for API requests. Token expires after 24 hours.
+
+The node automatically signs in to obtain a JWT, then sends both headers on every API request:
+- `apikey: <your apiKey>`
+- `Authorization: JWT <token>`
 
 API reference: [HackNotice API (Postman)](https://documenter.getpostman.com/view/806684/RWaHzA6C)
 

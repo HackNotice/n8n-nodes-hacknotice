@@ -1,7 +1,11 @@
 import {
+	type IExecuteFunctions,
 	ILoadOptionsFunctions,
+	type INodeExecutionData,
+	type IDataObject,
 	INodePropertyOptions,
 	NodeConnectionTypes,
+	NodeOperationError,
 	type INodeType,
 	type INodeTypeDescription,
 } from 'n8n-workflow';
@@ -9,6 +13,130 @@ import { thirdPartyAlertsDescription } from './resources/thirdPartyAlerts';
 import { firstPartyAlertsDescription } from './resources/firstPartyAlerts';
 import { researchDescription } from './resources/research';
 import { endUserAlertsDescription } from './resources/endUserAlerts';
+
+const DEFAULT_BASE_URL = 'https://api.hacknotice.com';
+const EMPTY_OPTION: INodePropertyOptions = { name: '', value: '' };
+
+type SavedSearchListItem = {
+	id?: string;
+	name?: string;
+	search?: unknown;
+	endpoint?: string;
+};
+
+/** Keys we never take from saved-search JSON — time window comes only from Limit by Time. */
+const TIME_KEYS_FROM_SAVED_SEARCH = [
+	'hours_ago',
+	'start_date',
+	'end_date',
+	'startdate',
+	'enddate',
+] as const;
+
+function stripSavedSearchTimeFields(body: Record<string, unknown>): void {
+	for (const key of TIME_KEYS_FROM_SAVED_SEARCH) {
+		delete body[key];
+	}
+}
+
+function formatDateOnlyLocal(d: Date): string {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
+/**
+ * Applies the node's "Limit by Time" (`timeRange`). Any time fields from the saved search are removed first.
+ * - lastDay → `hours_ago: 24`
+ * - lastWeek → `start_date` or `startdate` (research) = today minus 7 days (date only)
+ * - lastMonth → same with today minus one calendar month
+ */
+function applyLimitByTime(body: Record<string, unknown>, timeRange: string, isResearch: boolean): void {
+	stripSavedSearchTimeFields(body);
+
+	if (timeRange === 'lastDay') {
+		body.hours_ago = 24;
+		return;
+	}
+
+	const d = new Date();
+	if (timeRange === 'lastWeek') {
+		d.setDate(d.getDate() - 7);
+	} else if (timeRange === 'lastMonth') {
+		d.setMonth(d.getMonth() - 1);
+	} else {
+		body.hours_ago = 24;
+		return;
+	}
+
+	d.setHours(0, 0, 0, 0);
+	const dateOnly = formatDateOnlyLocal(d);
+
+	if (isResearch) {
+		body.startdate = dateOnly;
+	} else {
+		body.start_date = dateOnly;
+	}
+}
+
+async function getBaseUrl(this: ILoadOptionsFunctions): Promise<string> {
+	const credentials = (await this.getCredentials('hackNoticeApi')) as { baseUrl?: string } | null;
+	return ((credentials?.baseUrl as string) || DEFAULT_BASE_URL).replace(/\/$/, '');
+}
+
+async function getSavedSearchOptions(
+	this: ILoadOptionsFunctions,
+	url: string,
+	valueMapper: (item: SavedSearchListItem) => string,
+): Promise<INodePropertyOptions[]> {
+	const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
+		method: 'GET',
+		url,
+		json: true,
+	})) as SavedSearchListItem[];
+
+	if (!Array.isArray(response)) {
+		return [EMPTY_OPTION];
+	}
+
+	const mapped = response
+		.filter((item) => item && item.search != null)
+		.map((item) => ({
+			name: item.name ?? '',
+			value: valueMapper(item),
+		}));
+
+	return [EMPTY_OPTION, ...mapped];
+}
+
+type ResearchEndpointFilter = 'phrase' | 'wordpool';
+
+async function getResearchSavedSearchOptions(
+	this: ILoadOptionsFunctions,
+	filter: ResearchEndpointFilter,
+): Promise<INodePropertyOptions[]> {
+	const baseUrl = await getBaseUrl.call(this);
+	const endpointQuery = filter === 'wordpool' ? 'wordpool' : 'phrase';
+	const modernUrl = `${baseUrl}/saved-searches/research?endpoint=${endpointQuery}&limit=1000`;
+
+	const phraseValueMapper = (item: SavedSearchListItem) =>
+		JSON.stringify({
+			id: item.id ?? '',
+			endpoint: item.endpoint ?? '',
+			search: item.search ?? {},
+		});
+
+	const wordpoolValueMapper = (item: SavedSearchListItem) =>
+		JSON.stringify({
+			id: item.id ?? '',
+			endpoint: item.endpoint ?? 'wordpool',
+			search: item.search ?? {},
+		});
+
+	const valueMapper = filter === 'wordpool' ? wordpoolValueMapper : phraseValueMapper;
+	return await getSavedSearchOptions.call(this, modernUrl, valueMapper);
+}
 
 export class HackNotice implements INodeType {
 	description: INodeTypeDescription = {
@@ -77,186 +205,284 @@ export class HackNotice implements INodeType {
 			async getThirdPartySavedSearches(
 				this: ILoadOptionsFunctions,
 			): Promise<INodePropertyOptions[]> {
-				const credentials = (await this.getCredentials('hackNoticeApi')) as {
-					baseUrl?: string;
-				} | null;
-
-				const baseUrl = ((credentials?.baseUrl as string) || 'https://api.hacknotice.com').replace(
-					/\/$/,
-					'',
-				);
-
-				const response = (await this.helpers.httpRequestWithAuthentication.call(
+				const baseUrl = await getBaseUrl.call(this);
+				return await getSavedSearchOptions.call(
 					this,
-					'hackNoticeApi',
-					{
-						method: 'GET',
-						url: `${baseUrl}/hackalertsavedsearch/page/0`,
-						json: true,
-					},
-				)) as Array<{ _id?: string; name?: string; search?: unknown }>;
-				const empty = [{ name: '', value: '' }];
-				if (!Array.isArray(response)) {
-					return empty;
-				}
-				return empty.concat(
-					response
-						.filter((item) => item && item.search)
-						.map((item) => ({
-							name: item.name ?? '',
-							// Store the full `search` object as a JSON string so it can be used directly as request body.
-							value: JSON.stringify(item.search ?? {}),
-						})),
+					`${baseUrl}/saved-searches/thirdparty?limit=1000`,
+					(item) => JSON.stringify(item.search ?? {}),
 				);
 			},
 
 			async getFirstPartySavedSearches(
 				this: ILoadOptionsFunctions,
 			): Promise<INodePropertyOptions[]> {
-				const credentials = (await this.getCredentials('hackNoticeApi')) as {
-					baseUrl?: string;
-				} | null;
-
-				const baseUrl = ((credentials?.baseUrl as string) || 'https://api.hacknotice.com').replace(
-					/\/$/,
-					'',
-				);
-
-				const response = (await this.helpers.httpRequestWithAuthentication.call(
+				const baseUrl = await getBaseUrl.call(this);
+				return await getSavedSearchOptions.call(
 					this,
-					'hackNoticeApi',
-					{
-						method: 'GET',
-						url: `${baseUrl}/domainalertsavedsearch/page/0`,
-						json: true,
-					},
-				)) as Array<{ _id?: string; name?: string; search?: unknown }>;
-				const empty = [{ name: '', value: '' }];
-				if (!Array.isArray(response)) {
-					return empty;
-				}
-				return empty.concat(
-					response
-						.filter((item) => item && item.search)
-						.map((item) => ({
-							name: item.name ?? '',
-							value: JSON.stringify(item.search ?? {}),
-						})),
+					`${baseUrl}/saved-searches/firstparty?limit=1000`,
+					(item) => JSON.stringify(item.search ?? {}),
 				);
 			},
 
 			async getEndUserSavedSearches(
 				this: ILoadOptionsFunctions,
 			): Promise<INodePropertyOptions[]> {
-				const credentials = (await this.getCredentials('hackNoticeApi')) as {
-					baseUrl?: string;
-				} | null;
-
-				const baseUrl = ((credentials?.baseUrl as string) || 'https://api.hacknotice.com').replace(
-					/\/$/,
-					'',
-				);
-
-				const response = (await this.helpers.httpRequestWithAuthentication.call(
+				const baseUrl = await getBaseUrl.call(this);
+				return await getSavedSearchOptions.call(
 					this,
-					'hackNoticeApi',
-					{
-						method: 'GET',
-						url: `${baseUrl}/endusersavedsearch/page/0`,
-						json: true,
-					},
-				)) as Array<{ _id?: string; name?: string; search?: unknown }>;
-				const empty = [{ name: '', value: '' }];
-				if (!Array.isArray(response)) {
-					return empty;
-				}
-				return empty.concat(
-					response
-						.filter((item) => item && item.search)
-						.map((item) => ({
-							name: item.name ?? '',
-							value: JSON.stringify(item.search ?? {}),
-						})),
+					`${baseUrl}/saved-searches/enduser?limit=1000`,
+					(item) => JSON.stringify(item.search ?? {}),
 				);
 			},
 
-			async getResearchSavedSearches(
+			async getPhraseResearchSavedSearches(
 				this: ILoadOptionsFunctions,
 			): Promise<INodePropertyOptions[]> {
-				const credentials = (await this.getCredentials('hackNoticeApi')) as {
-					baseUrl?: string;
-				} | null;
-
-				const baseUrl = ((credentials?.baseUrl as string) || 'https://api.hacknotice.com').replace(
-					/\/$/,
-					'',
-				);
-
-				const response = (await this.helpers.httpRequestWithAuthentication.call(
-					this,
-					'hackNoticeApi',
-					{
-						method: 'GET',
-						url: `${baseUrl}/researchsavedsearch/page/0`,
-						json: true,
-					},
-				)) as Array<{ _id?: string; name?: string; search?: string | unknown }>;
-				const empty = [{ name: '', value: '' }];
-				if (!Array.isArray(response)) {
-					return empty;
-				}
-				const prefix = '__research__::';
-				return empty.concat(
-					response
-						.filter((item) => item && item.search != null)
-						.map((item) => {
-							const id = item._id ?? '';
-							const searchStr =
-								typeof item.search === 'string'
-									? item.search
-									: JSON.stringify(item.search ?? {});
-							return {
-								name: item.name ?? '',
-								value: `${prefix}${id}::${searchStr}`,
-							};
-						}),
-				);
+				return await getResearchSavedSearchOptions.call(this, 'phrase');
 			},
 
-			// async getTiers(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-			// 	const credentials = (await this.getCredentials('hackNoticeApi')) as {
-			// 		baseUrl?: string;
-			// 	} | null;
-
-			// 	const baseUrl = ((credentials?.baseUrl as string) || 'https://api.hacknotice.com').replace(
-			// 		/\/$/,
-			// 		'',
-			// 	);
-
-			// 	const response = (await this.helpers.httpRequestWithAuthentication.call(
-			// 		this,
-			// 		'hackNoticeApi',
-			// 		{
-			// 			method: 'POST',
-			// 			url: `${baseUrl}/tiers/page/0`,
-			// 			body: {},
-			// 			json: true,
-			// 		},
-			// 	)) as Array<{ _id?: string; tier: string; alert_collection_name?: string }>;
-
-			// 	if (!Array.isArray(response)) {
-			// 		return [{ name: 'No Tier', value: '' }];
-			// 	}
-
-			// 	const hackalertTiers = response
-			// 		.filter((item) => item && item.alert_collection_name === 'hackalert')
-			// 		.map((item) => ({
-			// 			name: item.tier,
-			// 			value: item.tier,
-			// 		}));
-
-			// 	return [{ name: 'No Tier', value: '' }, ...hackalertTiers];
-			// },
+			async getWordpoolResearchSavedSearches(
+				this: ILoadOptionsFunctions,
+			): Promise<INodePropertyOptions[]> {
+				return await getResearchSavedSearchOptions.call(this, 'wordpool');
+			},
 		},
 	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const PAGE_SIZE = 50;
+		const MAX_ITEMS = 1_000;
+
+		const allowedOperationsByResource: Record<string, string[]> = {
+			thirdPartyAlerts: ['getThirdPartyAlerts'],
+			firstPartyAlerts: ['getFirstPartyAlerts'],
+			research: ['getPhraseAlerts', 'getWordpoolAlerts'],
+			endUserAlerts: ['getEndUserAlerts'],
+		};
+
+		const endpointByResource: Record<string, string> = {
+			thirdPartyAlerts: '/hackalerts/page',
+			firstPartyAlerts: '/domainalerts/page',
+			endUserAlerts: '/enduseralerts/page',
+		};
+
+		const savedSearchParamByResource: Record<string, string> = {
+			thirdPartyAlerts: 'thirdPartySavedSearchId',
+			firstPartyAlerts: 'firstPartySavedSearchId',
+			endUserAlerts: 'endUserSavedSearchId',
+		};
+
+		const extractItems = (response: unknown): unknown[] => {
+			if (Array.isArray(response)) return response;
+			if (response && typeof response === 'object') {
+				const r = response as Record<string, unknown>;
+				if (Array.isArray(r.data)) return r.data;
+				if (Array.isArray(r.results)) return r.results;
+				if (Array.isArray(r.items)) return r.items;
+			}
+			// Fallback: if the response isn't an array, return it as a single item.
+			// This keeps existing operations from breaking on unexpected response shapes.
+			return response !== undefined ? [response] : [];
+		};
+
+		// Parses the saved-search parameter into the request body (third/first/end user).
+		const parseSavedSearchBody = (raw: unknown): Record<string, unknown> => {
+			if (typeof raw !== 'string' || raw.trim() === '') return {};
+			try {
+				const parsed = JSON.parse(raw);
+				return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+			} catch {
+				return {};
+			}
+		};
+
+		// Research: JSON from GET /saved-searches/research?endpoint=phrase|wordpool, or legacy `__research__::` prefix.
+		const parseResearchSavedSearch = (
+			raw: unknown,
+		): { body: Record<string, unknown>; savedEndpoint?: string } => {
+			if (typeof raw !== 'string' || raw.trim() === '') return { body: {} };
+			const trimmed = raw.trim();
+			if (trimmed.startsWith('{')) {
+				try {
+					const parsed = JSON.parse(trimmed) as {
+						id?: string;
+						endpoint?: string;
+						search?: Record<string, unknown>;
+					};
+					if (
+						parsed.search &&
+						typeof parsed.search === 'object' &&
+						parsed.search !== null &&
+						!Array.isArray(parsed.search)
+					) {
+						return { body: { ...parsed.search }, savedEndpoint: parsed.endpoint };
+					}
+				} catch {
+					/* fall through */
+				}
+			}
+			const prefix = '__research__::';
+			if (raw.startsWith(prefix)) {
+				const after = raw.slice(prefix.length);
+				const idx = after.indexOf('::');
+				const jsonStr = idx >= 0 ? after.slice(idx + 2) : after;
+				const parsed = jsonStr ? JSON.parse(jsonStr) : {};
+				return {
+					body:
+						parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+							? (parsed as Record<string, unknown>)
+							: {},
+				};
+			}
+			try {
+				const parsed = JSON.parse(raw);
+				return {
+					body:
+						parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+							? (parsed as Record<string, unknown>)
+							: {},
+				};
+			} catch {
+				return { body: {} };
+			}
+		};
+
+		const credentials = (await this.getCredentials('hackNoticeApi')) as { baseUrl?: string } | null;
+		const baseUrl = ((credentials?.baseUrl as string) || 'https://api.hacknotice.com').replace(/\/$/, '');
+
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+
+		for (let i = 0; i < items.length; i++) {
+			try {
+				const resource = this.getNodeParameter('resource', i) as string;
+				const operation = this.getNodeParameter('operation', i) as string;
+
+				const allowedOps = allowedOperationsByResource[resource] ?? [];
+				if (!allowedOps.includes(operation)) {
+					throw new NodeOperationError(this.getNode(), `Unsupported operation: ${operation}`, {
+						itemIndex: i,
+					});
+				}
+
+				const endpointBase = endpointByResource[resource];
+				if (resource !== 'research' && !endpointBase) {
+					throw new NodeOperationError(this.getNode(), `Unsupported resource: ${resource}`, {
+						itemIndex: i,
+					});
+				}
+
+				// Optional safety params (may not be exposed in the UI yet).
+				const returnAll = this.getNodeParameter('returnAll', i, false) as boolean;
+				const limitParam = this.getNodeParameter('limit', i, PAGE_SIZE) as number;
+				const safeLimit =
+					typeof limitParam === 'number' && limitParam >= 0
+						? Math.min(limitParam, PAGE_SIZE, MAX_ITEMS)
+						: PAGE_SIZE;
+
+				let requestBody: Record<string, unknown> = {};
+				let researchPhraseEndpoint: string | undefined;
+
+				if (resource === 'research') {
+					const savedSearchRaw =
+						operation === 'getPhraseAlerts'
+							? (this.getNodeParameter('phraseResearchSavedSearch', i, '') as unknown)
+							: (this.getNodeParameter('wordpoolResearchSavedSearch', i, '') as unknown);
+					const parsed = parseResearchSavedSearch(savedSearchRaw);
+					requestBody = parsed.body;
+					researchPhraseEndpoint = parsed.savedEndpoint;
+				} else {
+					const savedSearchParamName = savedSearchParamByResource[resource];
+					const savedSearchRaw = this.getNodeParameter(savedSearchParamName, i, '') as unknown;
+					requestBody = parseSavedSearchBody(savedSearchRaw);
+				}
+
+				const timeRange = this.getNodeParameter('timeRange', i, 'lastDay') as string;
+				applyLimitByTime(requestBody, timeRange, resource === 'research');
+
+				const safeStringify = (value: unknown): string => {
+					try {
+						return JSON.stringify(value);
+					} catch {
+						return String(value);
+					}
+				};
+				const requestBodyForLog = safeStringify(requestBody);
+				const requestBodyForLogTruncated =
+					requestBodyForLog.length > 10_000 ? `${requestBodyForLog.slice(0, 10_000)}... (truncated)` : requestBodyForLog;
+
+				const results: unknown[] = [];
+
+				const requestPage = async (page: number): Promise<unknown[]> => {
+					let url: string;
+					if (resource === 'research') {
+						if (operation === 'getWordpoolAlerts') {
+							url = `${baseUrl}/research8/search/pool/page/${page}`;
+						} else if (operation === 'getPhraseAlerts') {
+							const ep = (researchPhraseEndpoint || '').toLowerCase();
+							url =
+								ep === 'filename'
+									? `${baseUrl}/research8/search/filename/term/page/${page}`
+									: `${baseUrl}/research8/search/term/page/${page}`;
+						} else {
+							url = `${baseUrl}/research8/search/term/page/${page}`;
+						}
+					} else {
+						url = `${baseUrl}${endpointBase}/${page}`;
+					}
+					// Logs both URL and payload so you can verify what we send to the API.
+					// Uses n8n's built-in logger (no console/process).
+					// eslint-disable-next-line no-console
+					console.log(
+						`[HackNotice] API request page=${page} url=${url} payload=${requestBodyForLogTruncated}`,
+					);
+					// Use the node credentials + n8n helper that handles authentication.
+					const pageResponse = await this.helpers.httpRequestWithAuthentication.call(
+						this,
+						'hackNoticeApi',
+						{
+							method: 'POST',
+							url,
+							body: requestBody,
+							json: true,
+						},
+					);
+					return extractItems(pageResponse);
+				};
+
+				if (!returnAll) {
+					const pageItems = await requestPage(0);
+					results.push(...pageItems.slice(0, safeLimit));
+				} else {
+					// Fetch pages sequentially (page=0,1,2,...) until:
+					// - last page has < PAGE_SIZE items, OR
+					// - MAX_ITEMS is reached, OR
+					// - API returns an empty page (extra protection vs infinite loops)
+					let page = 0;
+					while (results.length < MAX_ITEMS) {
+						const pageItems = await requestPage(page);
+						if (pageItems.length === 0) break;
+
+						const remaining = MAX_ITEMS - results.length;
+						results.push(...pageItems.slice(0, remaining));
+
+						if (pageItems.length < PAGE_SIZE) break;
+						page++;
+					}
+				}
+
+				// Always output items as an array of json objects
+				const jsonArray = this.helpers.returnJsonArray(results as unknown as IDataObject[]) as INodeExecutionData[];
+				for (const data of jsonArray) {
+					data.pairedItem = { item: i };
+					returnData.push(data);
+				}
+			} catch (error) {
+				// Surface configuration/API failures as an operational error per item.
+				throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+			}
+		}
+
+		return [returnData];
+	}
 }
