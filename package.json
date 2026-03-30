@@ -1,6 +1,6 @@
 {
     "name": "@hacknotice/n8n-nodes-hacknotice",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "description": "Fetch HackNotice alerts, saved searches, and assessment resources for n8n workflows.",
     "license": "MIT",
     "homepage": "https://github.com/HackNotice/n8n-node#readme",
