@@ -1,6 +1,6 @@
 {
     "name": "@hacknotice/n8n-nodes-hacknotice",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "description": "Fetch HackNotice alerts, saved searches, and assessment resources for n8n workflows.",
     "license": "MIT",
     "homepage": "https://github.com/HackNotice/n8n-node#readme",
@@ -13,7 +13,7 @@
     "author": {
         "name": "Nicolas Spessot",
         "email": "nicolas@hacknotice.com"
-    }, 
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/HackNotice/n8n-node.git"
