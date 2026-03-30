@@ -77,10 +77,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # registry-url is required so npm can authenticate in CI:
+      # - OIDC trusted publishing (no NPM_TOKEN), or
+      # - NODE_AUTH_TOKEN when using secrets.NPM_TOKEN
+      # See https://docs.npmjs.com/trusted-publishers#github-actions-configuration
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          # Trusted publishing requires Node 22.14+ (npm 11.5.1+); pin a current 22.x.
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
       - name: Install dependencies
@@ -90,12 +96,13 @@ jobs:
         # Publishes to npm with a provenance attestation (requires id-token: write above).
         # Lint and build run automatically as part of the release process.
         #
-        # Option A (OIDC): leave NPM_TOKEN unset — the token step is skipped and
-        #   npm uses the OIDC exchange instead.
-        # Option B (token): set NPM_TOKEN in repo secrets — it is written to
-        #   .npmrc here before publishing.
+        # Option A (OIDC Trusted Publisher): leave repo secrets NPM_TOKEN unset; npm uses OIDC.
+        # Option B (token): add NPM_TOKEN — only then set NODE_AUTH_TOKEN (empty
+        #   NODE_AUTH_TOKEN can break OIDC when using Trusted Publishers).
         run: |
-          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          if [ -n "$NPM_TOKEN" ]; then
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+          fi
           npm run release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
