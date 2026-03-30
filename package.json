@@ -13,7 +13,7 @@
     "author": {
         "name": "Nicolas Spessot",
         "email": "nicolas@hacknotice.com"
-    },
+    }, 
     "repository": {
         "type": "git",
         "url": "https://github.com/HackNotice/n8n-node.git"
