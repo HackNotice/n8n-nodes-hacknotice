@@ -1,5 +1,5 @@
 {
-    "name": "n8n-nodes-hacknotice",
+    "name": "@hacknotice/n8n-nodes-hacknotice",
     "version": "1.0.3",
     "description": "Fetch HackNotice alerts, saved searches, and assessment resources for n8n workflows.",
     "license": "MIT",
