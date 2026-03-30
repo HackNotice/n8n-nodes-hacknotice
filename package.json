@@ -14,10 +14,7 @@
         "name": "Nicolas Spessot",
         "email": "nicolas@hacknotice.com"
     },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/HackNotice/n8n-node.git"
-    },
+    "repository": "https://github.com/HackNotice/n8n-node",
     "scripts": {
         "build": "n8n-node build",
         "build:watch": "tsc --watch",
