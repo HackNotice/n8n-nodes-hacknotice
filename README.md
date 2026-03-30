@@ -19,7 +19,7 @@ Use the **HackNotice API** credential.
 
 ### API Key
 - **API Key** – Your HackNotice API key.
-- **API Base URL** – Optional; defaults to `https://api.hacknotice.com`.
+- **API Base URL** – Fixed to `https://extensionapi.hacknotice.com`.
 
 ### Email & Password (used to obtain JWT)
 - **Email** – Your HackNotice account email.

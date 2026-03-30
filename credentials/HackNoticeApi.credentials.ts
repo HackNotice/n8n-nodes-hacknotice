@@ -7,6 +7,7 @@ import type {
 } from 'n8n-workflow';
 
 const AUTH_SIGN_IN_PATH = '/auth/sign_in';
+const API_BASE_URL = 'https://extensionapi.hacknotice.com';
 
 export class HackNoticeApi implements ICredentialType {
 	name = 'hackNoticeApi';
@@ -40,15 +41,6 @@ export class HackNoticeApi implements ICredentialType {
 			type: 'string',
 			typeOptions: { password: true },
 			default: '',
-		},
-		// Shared
-		{
-			displayName: 'API Base URL',
-			name: 'baseUrl',
-			type: 'string',
-			default: 'https://api.hacknotice.com',
-			placeholder: 'https://api.hacknotice.com',
-			description: 'Base URL of the HackNotice API (used for sign-in and API requests).',
 		},
 	];
 
@@ -97,8 +89,7 @@ export class HackNoticeApi implements ICredentialType {
 		const password = (credentials as unknown as Record<string, unknown>)?.password as string;
 		if (!email || !password) throw new Error('Email and Password are required to obtain the JWT token');
 
-		const baseUrl = ((credentials.baseUrl as string) || 'https://api.hacknotice.com').replace(/\/$/, '');
-		const signInUrl = `${baseUrl}${AUTH_SIGN_IN_PATH}`;
+		const signInUrl = `${API_BASE_URL}${AUTH_SIGN_IN_PATH}`;
 
 		const response = await fetch(signInUrl, {
 			method: 'POST',
@@ -144,7 +135,7 @@ export class HackNoticeApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: '={{$credentials?.baseUrl}}',
+			baseURL: API_BASE_URL,
 			url: '/auth/verify',
 			method: 'POST',
 		},

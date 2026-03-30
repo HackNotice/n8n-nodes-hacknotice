@@ -14,7 +14,7 @@ import { firstPartyAlertsDescription } from './resources/firstPartyAlerts';
 import { researchDescription } from './resources/research';
 import { endUserAlertsDescription } from './resources/endUserAlerts';
 
-const DEFAULT_BASE_URL = 'https://api.hacknotice.com';
+const API_BASE_URL = 'https://extensionapi.hacknotice.com';
 const EMPTY_OPTION: INodePropertyOptions = { name: '', value: '' };
 
 type SavedSearchListItem = {
@@ -81,8 +81,7 @@ function applyLimitByTime(body: Record<string, unknown>, timeRange: string, isRe
 }
 
 async function getBaseUrl(this: ILoadOptionsFunctions): Promise<string> {
-	const credentials = (await this.getCredentials('hackNoticeApi')) as { baseUrl?: string } | null;
-	return ((credentials?.baseUrl as string) || DEFAULT_BASE_URL).replace(/\/$/, '');
+	return API_BASE_URL;
 }
 
 async function getSavedSearchOptions(
@@ -161,7 +160,7 @@ export class HackNotice implements INodeType {
 			},
 		],
 		requestDefaults: {
-			baseURL: "={{ ($credentials.baseUrl || 'https://api.hacknotice.com').replace(/\\/$/, '') }}",
+			baseURL: API_BASE_URL,
 			headers: {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',
@@ -347,8 +346,7 @@ export class HackNotice implements INodeType {
 			}
 		};
 
-		const credentials = (await this.getCredentials('hackNoticeApi')) as { baseUrl?: string } | null;
-		const baseUrl = ((credentials?.baseUrl as string) || 'https://api.hacknotice.com').replace(/\/$/, '');
+		const baseUrl = API_BASE_URL;
 
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
