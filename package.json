@@ -3,7 +3,10 @@
     "version": "0.1.0",
     "description": "Fetch HackNotice alerts, saved searches, and assessment resources for n8n workflows.",
     "license": "MIT",
-    "homepage": "",
+    "homepage": "https://github.com/HackNotice/n8n-node#readme",
+    "bugs": {
+        "url": "https://github.com/HackNotice/n8n-node/issues"
+    },
     "keywords": [
         "n8n-community-node-package"
     ],
@@ -15,15 +18,15 @@
         "type": "git",
         "url": "https://github.com/HackNotice/n8n-node.git"
     },
-   "scripts": {
-		"build": "n8n-node build",
-		"build:watch": "tsc --watch",
-		"dev": "n8n-node dev",
-		"lint": "n8n-node lint",
+    "scripts": {
+        "build": "n8n-node build",
+        "build:watch": "tsc --watch",
+        "dev": "n8n-node dev",
+        "lint": "n8n-node lint",
         "lint:fix": "n8n-node lint --fix",
-		"release": "n8n-node release",
-		"prepublishOnly": "n8n-node prerelease"
-	},
+        "release": "n8n-node release",
+        "prepublishOnly": "n8n-node prerelease"
+    },
     "files": [
         "dist"
     ],
@@ -38,7 +41,7 @@
         ]
     },
     "devDependencies": {
-        "@n8n/node-cli": "*",
+        "@n8n/node-cli": "^0.23.1",
         "eslint": "9.32.0",
         "prettier": "3.6.2",
         "release-it": "^19.0.4",
