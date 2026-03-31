@@ -52,5 +52,15 @@
         },
         "publishConfig": {
                 "provenance": true
+        },
+        "release-it": {
+            "git": {
+                "commitMessage": "chore: release v${version}",
+                "tagName": "v${version}",
+                "requireCleanWorkingDir": true
+            },
+            "github": {
+                "release": true
+            }
         }
 }
