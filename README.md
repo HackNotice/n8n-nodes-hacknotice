@@ -1,6 +1,6 @@
 # n8n-nodes-hacknotice
 
-This is an n8n community node for [HackNotice](https://hacknotice.com/). It lets you fetch third party alerts in your n8n workflows.
+This is an n8n community node for [HackNotice](https://hacknotice.com/). It lets you fetch third-party, first-party, end-user, and research alerts in your n8n workflows.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
 
@@ -11,7 +11,21 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 ## Operations
 
 - **Third Party Alerts**
-  - Get all third party alerts (returns the same payload as the [HackNotice API](https://documenter.getpostman.com/view/806684/RWaHzA6C))
+  - Get Third Party Alerts
+
+- **First Party Alerts**
+  - Get Many First Party Alerts
+
+- **End User Alerts**
+  - Get End User Alerts
+
+- **Research**
+  - Get Phrase Alerts
+  - Get Wordpool Alerts
+
+All alert operations support:
+- Saved search selection (optional)
+- Limit By Time: `Last Day`, `Last Week`, `Last Month`
 
 ## Credentials
 
