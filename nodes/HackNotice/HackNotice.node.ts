@@ -398,17 +398,6 @@ export class HackNotice implements INodeType {
 				const timeRange = this.getNodeParameter('timeRange', i, 'lastDay') as string;
 				applyLimitByTime(requestBody, timeRange, resource === 'research');
 
-				const safeStringify = (value: unknown): string => {
-					try {
-						return JSON.stringify(value);
-					} catch {
-						return String(value);
-					}
-				};
-				const requestBodyForLog = safeStringify(requestBody);
-				const requestBodyForLogTruncated =
-					requestBodyForLog.length > 10_000 ? `${requestBodyForLog.slice(0, 10_000)}... (truncated)` : requestBodyForLog;
-
 				const results: unknown[] = [];
 
 				const requestPage = async (page: number): Promise<unknown[]> => {
@@ -428,12 +417,7 @@ export class HackNotice implements INodeType {
 					} else {
 						url = `${baseUrl}${endpointBase}/${page}`;
 					}
-					// Logs both URL and payload so you can verify what we send to the API.
-					// Uses n8n's built-in logger (no console/process).
-					// eslint-disable-next-line no-console
-					console.log(
-						`[HackNotice] API request page=${page} url=${url} payload=${requestBodyForLogTruncated}`,
-					);
+					
 					// Use the node credentials + n8n helper that handles authentication.
 					const pageResponse = await this.helpers.httpRequestWithAuthentication.call(
 						this,
