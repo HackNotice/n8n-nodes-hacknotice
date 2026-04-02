@@ -11,8 +11,9 @@
                 "n8n-community-node-package"
         ],
         "author": {
-                "name": "Nicolas Spessot",
-                "email": "nicolas@hacknotice.com"
+                "name": "HackNotice",
+                "email": "support@hacknotice.com",
+                "url": "https://hacknotice.com"
         },
         "repository": {
                 "type": "git",
