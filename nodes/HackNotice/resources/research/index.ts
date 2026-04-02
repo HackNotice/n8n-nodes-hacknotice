@@ -82,7 +82,7 @@ export const researchDescription: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Limit By Time',
+		displayName: 'Limit by Time',
 		name: 'timeRange',
 		type: 'options',
 		default: 'lastDay',

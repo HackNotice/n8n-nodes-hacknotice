@@ -4,7 +4,9 @@ import {
 	type INodeExecutionData,
 	type IDataObject,
 	INodePropertyOptions,
+	type JsonObject,
 	NodeConnectionTypes,
+	NodeApiError,
 	NodeOperationError,
 	type INodeType,
 	type INodeTypeDescription,
@@ -84,22 +86,66 @@ async function getBaseUrl(this: ILoadOptionsFunctions): Promise<string> {
 	return API_BASE_URL;
 }
 
+const END_USER_SAVED_SEARCH_LOG_MAX = 24_000;
+
+function logEndUserSavedSearchDebug(message: string, payload: unknown): void {
+	const line = `[HackNotice endUserSavedSearches] ${message} ${typeof payload === 'string' ? payload : JSON.stringify(payload)}`;
+	// eslint-disable-next-line no-console -- intentional debug for loadOptions troubleshooting (n8n server stdout)
+	console.log(line.length > END_USER_SAVED_SEARCH_LOG_MAX ? `${line.slice(0, END_USER_SAVED_SEARCH_LOG_MAX)}…[truncated]` : line);
+}
+
 async function getSavedSearchOptions(
 	this: ILoadOptionsFunctions,
 	url: string,
 	valueMapper: (item: SavedSearchListItem) => string,
+	options?: { logEndUserSavedSearches?: boolean },
 ): Promise<INodePropertyOptions[]> {
-	const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
-		method: 'GET',
-		url,
-		json: true,
-	})) as SavedSearchListItem[];
+	const log = options?.logEndUserSavedSearches === true;
 
-	if (!Array.isArray(response)) {
+	if (log) {
+		logEndUserSavedSearchDebug('request', { method: 'GET', url });
+	}
+
+	let response: unknown;
+	try {
+		response = await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
+			method: 'GET',
+			url,
+			json: true,
+		});
+	} catch (error) {
+		if (log) {
+			logEndUserSavedSearchDebug('response error', {
+				url,
+				message: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+			});
+		}
+		throw error;
+	}
+
+	if (log) {
+		if (Array.isArray(response)) {
+			logEndUserSavedSearchDebug('response', {
+				ok: true,
+				itemCount: response.length,
+				body: response,
+			});
+		} else {
+			logEndUserSavedSearchDebug('response (non-array — dropdown may be empty)', {
+				type: typeof response,
+				body: response,
+			});
+		}
+	}
+
+	const list = response as SavedSearchListItem[];
+
+	if (!Array.isArray(list)) {
 		return [EMPTY_OPTION];
 	}
 
-	const mapped = response
+	const mapped = list
 		.filter((item) => item && item.search != null)
 		.map((item) => ({
 			name: item.name ?? '',
@@ -159,13 +205,6 @@ export class HackNotice implements INodeType {
 				required: true,
 			},
 		],
-		requestDefaults: {
-			baseURL: API_BASE_URL,
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-			},
-		},
 		properties: [
 			{
 				displayName: 'Resource',
@@ -231,6 +270,7 @@ export class HackNotice implements INodeType {
 					this,
 					`${baseUrl}/saved-searches/enduser?limit=1000`,
 					(item) => JSON.stringify(item.search ?? {}),
+					{ logEndUserSavedSearches: true },
 				);
 			},
 
@@ -460,8 +500,13 @@ export class HackNotice implements INodeType {
 					returnData.push(data);
 				}
 			} catch (error) {
-				// Surface configuration/API failures as an operational error per item.
-				throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+				// Keep validation/configuration failures as NodeOperationError.
+				if (error instanceof NodeOperationError) {
+					throw error;
+				}
+
+				// Wrap HTTP/API failures so status code and response body are visible in n8n UI.
+				throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
 			}
 		}
 
