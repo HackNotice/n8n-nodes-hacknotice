@@ -19,18 +19,83 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Get Many',
-				value: 'getAll',
-				action: 'Get many third party alerts',
+				name: 'Get Third Party Alerts',
+				value: 'getThirdPartyAlerts',
+				action: 'Get third party alerts',
 				description: 'Get third party alerts from the HackNotice API',
 				routing: {
 					request: {
 						method: 'POST',
-						url: '/breaches/search/page/0',
+						url: '/hackalerts/page/0',
+						// Merge saved search filters (search object) into request body.
+						body: '={{ $parameter["thirdPartySavedSearchId"] && $parameter["thirdPartySavedSearchId"] !== "" ? JSON.parse($parameter["thirdPartySavedSearchId"]) : {} }}',
 					},
 				},
 			},
+			// {
+			// 	name: 'Get Saved Searches',
+			// 	value: 'getSavedSearches',
+			// 	action: 'Get third party saved searches',
+			// 	description: 'Get third party saved searches from the HackNotice API',
+			// 	routing: {
+			// 		request: {
+			// 			method: 'GET',
+			// 			url: '/hackalertsavedsearch/page/0',
+			// 		},
+			// 	},
+			// },
 		],
-		default: 'getAll',
+		default: 'getThirdPartyAlerts',
+	},
+	{
+		displayName: 'Saved Search Name or ID',
+		name: 'thirdPartySavedSearchId',
+		type: 'options',
+		default: '',
+		options: [
+			{
+				name: '',
+				value: '',
+			},
+		],
+		description:
+			'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+		typeOptions: {
+			loadOptionsMethod: 'getThirdPartySavedSearches',
+		},
+		displayOptions: {
+			show: {
+				resource: ['thirdPartyAlerts'],
+				operation: ['getThirdPartyAlerts'],
+			},
+		},
+	},
+	{
+		displayName: 'Limit By Time',
+		name: 'timeRange',
+		type: 'options',
+		default: 'lastDay',
+		options: [
+			{
+				name: 'Last Day',
+				value: 'lastDay',
+			},
+			{
+				name: 'Last Week',
+				value: 'lastWeek',
+			},
+			{
+				name: 'Last Month',
+				value: 'lastMonth',
+			},
+		],
+		description:
+			'**Last Day** sends `hours_ago: 24`. **Last Week** / **Last Month** send `start_date` (today minus 7 days or 1 month). Time fields from the saved search are not used.',
+		displayOptions: {
+			show: {
+				resource: ['thirdPartyAlerts'],
+				operation: ['getThirdPartyAlerts'],
+			},
+		},
 	},
 ];
