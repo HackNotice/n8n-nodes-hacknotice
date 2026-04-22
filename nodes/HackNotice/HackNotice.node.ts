@@ -86,58 +86,16 @@ async function getBaseUrl(this: ILoadOptionsFunctions): Promise<string> {
 	return API_BASE_URL;
 }
 
-const END_USER_SAVED_SEARCH_LOG_MAX = 24_000;
-
-function logEndUserSavedSearchDebug(message: string, payload: unknown): void {
-	const line = `[HackNotice endUserSavedSearches] ${message} ${typeof payload === 'string' ? payload : JSON.stringify(payload)}`;
-	// eslint-disable-next-line no-console -- intentional debug for loadOptions troubleshooting (n8n server stdout)
-	console.log(line.length > END_USER_SAVED_SEARCH_LOG_MAX ? `${line.slice(0, END_USER_SAVED_SEARCH_LOG_MAX)}…[truncated]` : line);
-}
-
 async function getSavedSearchOptions(
 	this: ILoadOptionsFunctions,
 	url: string,
 	valueMapper: (item: SavedSearchListItem) => string,
-	options?: { logEndUserSavedSearches?: boolean },
 ): Promise<INodePropertyOptions[]> {
-	const log = options?.logEndUserSavedSearches === true;
-
-	if (log) {
-		logEndUserSavedSearchDebug('request', { method: 'GET', url });
-	}
-
-	let response: unknown;
-	try {
-		response = await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
-			method: 'GET',
-			url,
-			json: true,
-		});
-	} catch (error) {
-		if (log) {
-			logEndUserSavedSearchDebug('response error', {
-				url,
-				message: error instanceof Error ? error.message : String(error),
-				stack: error instanceof Error ? error.stack : undefined,
-			});
-		}
-		throw error;
-	}
-
-	if (log) {
-		if (Array.isArray(response)) {
-			logEndUserSavedSearchDebug('response', {
-				ok: true,
-				itemCount: response.length,
-				body: response,
-			});
-		} else {
-			logEndUserSavedSearchDebug('response (non-array — dropdown may be empty)', {
-				type: typeof response,
-				body: response,
-			});
-		}
-	}
+	const response = await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
+		method: 'GET',
+		url,
+		json: true,
+	});
 
 	const list = response as SavedSearchListItem[];
 
@@ -270,7 +228,6 @@ export class HackNotice implements INodeType {
 					this,
 					`${baseUrl}/saved-searches/enduser?limit=1000`,
 					(item) => JSON.stringify(item.search ?? {}),
-					{ logEndUserSavedSearches: true },
 				);
 			},
 
