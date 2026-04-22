@@ -23,13 +23,6 @@ export const firstPartyAlertsDescription: INodeProperties[] = [
 				value: 'getFirstPartyAlerts',
 				action: 'Get first party alerts',
 				description: 'Get first party alerts from the HackNotice API',
-				routing: {
-					request: {
-						method: 'POST',
-						url: '/domainalerts/page/0',
-						body: '={{ $parameter["firstPartySavedSearchId"] && $parameter["firstPartySavedSearchId"] !== "" ? JSON.parse($parameter["firstPartySavedSearchId"]) : {} }}',
-					},
-				},
 			},
 		],
 		default: 'getFirstPartyAlerts',
@@ -58,7 +51,7 @@ export const firstPartyAlertsDescription: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Limit By Time',
+		displayName: 'Limit by Time',
 		name: 'timeRange',
 		type: 'options',
 		default: 'lastDay',

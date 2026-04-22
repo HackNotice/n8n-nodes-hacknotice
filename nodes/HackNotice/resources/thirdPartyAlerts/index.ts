@@ -23,14 +23,6 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 				value: 'getThirdPartyAlerts',
 				action: 'Get third party alerts',
 				description: 'Get third party alerts from the HackNotice API',
-				routing: {
-					request: {
-						method: 'POST',
-						url: '/hackalerts/page/0',
-						// Merge saved search filters (search object) into request body.
-						body: '={{ $parameter["thirdPartySavedSearchId"] && $parameter["thirdPartySavedSearchId"] !== "" ? JSON.parse($parameter["thirdPartySavedSearchId"]) : {} }}',
-					},
-				},
 			},
 			// {
 			// 	name: 'Get Saved Searches',
@@ -71,7 +63,7 @@ export const thirdPartyAlertsDescription: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Limit By Time',
+		displayName: 'Limit by Time',
 		name: 'timeRange',
 		type: 'options',
 		default: 'lastDay',

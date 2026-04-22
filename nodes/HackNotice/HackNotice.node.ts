@@ -4,7 +4,9 @@ import {
 	type INodeExecutionData,
 	type IDataObject,
 	INodePropertyOptions,
+	type JsonObject,
 	NodeConnectionTypes,
+	NodeApiError,
 	NodeOperationError,
 	type INodeType,
 	type INodeTypeDescription,
@@ -89,17 +91,19 @@ async function getSavedSearchOptions(
 	url: string,
 	valueMapper: (item: SavedSearchListItem) => string,
 ): Promise<INodePropertyOptions[]> {
-	const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
+	const response = await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
 		method: 'GET',
 		url,
 		json: true,
-	})) as SavedSearchListItem[];
+	});
 
-	if (!Array.isArray(response)) {
+	const list = response as SavedSearchListItem[];
+
+	if (!Array.isArray(list)) {
 		return [EMPTY_OPTION];
 	}
 
-	const mapped = response
+	const mapped = list
 		.filter((item) => item && item.search != null)
 		.map((item) => ({
 			name: item.name ?? '',
@@ -159,13 +163,6 @@ export class HackNotice implements INodeType {
 				required: true,
 			},
 		],
-		requestDefaults: {
-			baseURL: API_BASE_URL,
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-			},
-		},
 		properties: [
 			{
 				displayName: 'Resource',
@@ -460,8 +457,13 @@ export class HackNotice implements INodeType {
 					returnData.push(data);
 				}
 			} catch (error) {
-				// Surface configuration/API failures as an operational error per item.
-				throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+				// Keep validation/configuration failures as NodeOperationError.
+				if (error instanceof NodeOperationError) {
+					throw error;
+				}
+
+				// Wrap HTTP/API failures so status code and response body are visible in n8n UI.
+				throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
 			}
 		}
 

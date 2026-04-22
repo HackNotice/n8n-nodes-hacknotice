@@ -24,13 +24,6 @@ export const endUserAlertsDescription: INodeProperties[] = [
 				value: 'getEndUserAlerts',
 				action: 'Get end user alerts',
 				description: 'Get end user alerts from the HackNotice API',
-				routing: {
-					request: {
-						method: 'POST',
-						url: '/enduseralerts/page/0',
-						body: '={{ $parameter["endUserSavedSearchId"] && $parameter["endUserSavedSearchId"] !== "" ? JSON.parse($parameter["endUserSavedSearchId"]) : {} }}',
-					},
-				},
 			},
 		],
 		default: 'getEndUserAlerts',
@@ -59,7 +52,7 @@ export const endUserAlertsDescription: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Limit By Time',
+		displayName: 'Limit by Time',
 		name: 'timeRange',
 		type: 'options',
 		default: 'lastDay',
