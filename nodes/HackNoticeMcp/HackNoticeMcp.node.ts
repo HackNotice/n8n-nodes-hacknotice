@@ -44,6 +44,7 @@ import { McpStreamableHttpClient, type McpToolDescriptor } from './transport';
 const RESOURCE_TOOL = 'tool';
 const OP_CALL_TOOL = 'callTool';
 const OP_LIST_TOOLS = 'listTools';
+const DEFAULT_TOOL_ERROR_MESSAGE = 'MCP tool returned isError=true';
 
 /** Truncates a tool description for the dropdown so it stays readable. */
 function shortDescription(tool: McpToolDescriptor): string {
@@ -169,6 +170,20 @@ export class HackNoticeMcp implements INodeType {
 				description:
 					'Whether to emit one n8n item per entry of the tool result `content` array. Disable to emit a single item containing the full tool result.',
 			},
+			{
+				displayName: 'Fail on MCP Tool Error',
+				name: 'failOnToolError',
+				type: 'boolean',
+				default: true,
+				displayOptions: {
+					show: {
+						resource: [RESOURCE_TOOL],
+						operation: [OP_CALL_TOOL],
+					},
+				},
+				description:
+					'Whether to throw an error when the MCP response has isError=true. Keep enabled to trigger n8n Error Workflows for tool failures (for example MCP timeouts).',
+			},
 		],
 	};
 
@@ -253,8 +268,17 @@ export class HackNoticeMcp implements INodeType {
 						const args = parseToolArguments(rawArgs, this.getNode().name, i);
 
 						const splitContent = this.getNodeParameter('splitContent', i, true) as boolean;
+						const failOnToolError = this.getNodeParameter('failOnToolError', i, true) as boolean;
 
 						const result = await client.callTool(toolName, args);
+						if (failOnToolError && result.isError) {
+							const message = extractMcpToolErrorMessage(result);
+							throw new NodeOperationError(
+								this.getNode(),
+								`MCP tool '${toolName}' returned isError=true: ${message}`,
+								{ itemIndex: i },
+							);
+						}
 						const content = Array.isArray(result.content) ? result.content : [];
 
 						if (splitContent && content.length > 0) {
@@ -352,4 +376,18 @@ function parseToolArguments(
 		'Tool arguments must be a JSON object',
 		{ itemIndex },
 	);
+}
+
+/**
+ * Extracts a compact, human-readable error message from an MCP `tools/call`
+ * result. This is used when `isError=true` to provide useful context in n8n
+ * Error Workflows and execution logs.
+ */
+function extractMcpToolErrorMessage(result: { content?: Array<Record<string, unknown>> }): string {
+	const content = Array.isArray(result.content) ? result.content : [];
+	for (const entry of content) {
+		const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+		if (text) return text.length > 280 ? `${text.slice(0, 277)}...` : text;
+	}
+	return DEFAULT_TOOL_ERROR_MESSAGE;
 }
