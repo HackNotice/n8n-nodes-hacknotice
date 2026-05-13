@@ -4,9 +4,9 @@
  * PURPOSE
  * ----
  * Authenticates the HackNotice MCP node against a running hacknotice-mcp-server
- * (Streamable HTTP, JSON-RPC 2.0). It owns:
- *  - the `endpointUrl` (e.g. https://host:port/mcp)
- *  - the per-user `integrationKey` sent as `X-HackNotice-Integration-Key`
+ * (Streamable HTTP, JSON-RPC 2.0). It owns the per-user `integrationKey` sent as
+ * `X-HackNotice-Integration-Key`. The MCP endpoint URL is fixed in code
+ * (`HACKNOTICE_MCP_ENDPOINT_URL` in `nodes/HackNoticeMcp/constants.ts`).
  *
  * DATA SOURCES
  * ----
@@ -30,6 +30,8 @@ import type {
 	INodeProperties,
 } from 'n8n-workflow';
 
+import { HACKNOTICE_MCP_ENDPOINT_URL } from '../nodes/HackNoticeMcp/constants';
+
 const MCP_PROTOCOL_VERSION = '2024-11-05';
 
 export class HackNoticeMcpApi implements ICredentialType {
@@ -42,16 +44,6 @@ export class HackNoticeMcpApi implements ICredentialType {
 	documentationUrl = 'https://github.com/HackNotice/n8n-nodes-hacknotice#hacknotice-mcp-node';
 
 	properties: INodeProperties[] = [
-		{
-			displayName: 'MCP Endpoint URL',
-			name: 'endpointUrl',
-			type: 'string',
-			default: '',
-			placeholder: 'https://mcp.example.com:13348/mcp',
-			description:
-				'Full URL of the HackNotice MCP Streamable HTTP endpoint, including the path (default mcp-server path is /mcp).',
-			required: true,
-		},
 		{
 			displayName: 'Integration Key',
 			name: 'integrationKey',
@@ -100,7 +92,7 @@ export class HackNoticeMcpApi implements ICredentialType {
 	 */
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: '={{$credentials.endpointUrl}}',
+			baseURL: HACKNOTICE_MCP_ENDPOINT_URL,
 			url: '',
 			method: 'POST',
 			headers: {
@@ -116,7 +108,7 @@ export class HackNoticeMcpApi implements ICredentialType {
 					capabilities: {},
 					clientInfo: {
 						name: 'n8n-nodes-hacknotice-mcp-credential-test',
-						version: '1.0.0',
+						version: '2.0.0',
 					},
 				},
 			},
