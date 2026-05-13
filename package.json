@@ -1,6 +1,6 @@
 {
         "name": "n8n-nodes-hacknotice-api",
-        "version": "2.0.0",
+        "version": "2.0.1",
         "description": "Fetch HackNotice alerts, saved searches, and call HackNotice MCP tools from n8n workflows.",
         "license": "MIT",
         "homepage": "https://github.com/HackNotice/n8n-nodes-hacknotice#readme",
