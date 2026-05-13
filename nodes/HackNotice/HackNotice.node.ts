@@ -13,8 +13,14 @@ import {
 } from 'n8n-workflow';
 import { thirdPartyAlertsDescription } from './resources/thirdPartyAlerts';
 import { firstPartyAlertsDescription } from './resources/firstPartyAlerts';
+import { firstPartyWatchlistDescription } from './resources/firstPartyWatchlist';
 import { researchDescription } from './resources/research';
 import { endUserAlertsDescription } from './resources/endUserAlerts';
+import { endUserWatchlistDescription } from './resources/endUserWatchlist';
+import { thirdPartyWatchlistDescription } from './resources/thirdPartyWatchlist';
+import { assessmentsResourceDescription } from './resources/assessments';
+import { executeHackNoticeAssessmentItem } from './assessmentExecute';
+import { HACKNOTICE_ASSESSMENT_RESOURCES_SET, type AssessmentResourceKey } from './assessmentRegistry';
 
 const API_BASE_URL = 'https://extensionapi.hacknotice.com';
 const EMPTY_OPTION: INodePropertyOptions = { name: '', value: '' };
@@ -150,7 +156,7 @@ export class HackNotice implements INodeType {
 		defaultVersion: 1,
 		version: [1],
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Get alerts from the HackNotice API',
+		description: 'Call the HackNotice extensions API (alerts, assessments, and more)',
 		defaults: {
 			name: 'HackNotice',
 		},
@@ -171,28 +177,72 @@ export class HackNotice implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
-						name: 'Third Party Alert',
-						value: 'thirdPartyAlerts',
+						name: 'Assessment',
+						value: 'assessment',
+					},
+					{
+						name: 'Assessment Data File',
+						value: 'assessmentDataFile',
+					},
+					{
+						name: 'Assessment Data File (Invited)',
+						value: 'invitedAssessmentDataFile',
+					},
+					{
+						name: 'Assessment Event',
+						value: 'assessmentEvent',
+					},
+					{
+						name: 'Assessment Invite',
+						value: 'assessmentInvite',
+					},
+					{
+						name: 'Assessment Preference',
+						value: 'assessmentPreference',
+					},
+					{
+						name: 'Assessment Template',
+						value: 'assessmentTemplate',
+					},
+					{
+						name: 'End User',
+						value: 'endUserAlerts',
+					},
+					{
+						name: 'End User Watchlist',
+						value: 'endUserWatchlist',
 					},
 					{
 						name: 'First Party Alert',
 						value: 'firstPartyAlerts',
 					},
 					{
+						name: 'First Party Watchlist',
+						value: 'firstPartyWatchlist',
+					},
+					{
 						name: 'Research',
 						value: 'research',
 					},
 					{
-						name: 'End User',
-						value: 'endUserAlerts',
+						name: 'Third Party Alert',
+						value: 'thirdPartyAlerts',
+					},
+					{
+						name: 'Third Party Watchlist',
+						value: 'thirdPartyWatchlist',
 					},
 				],
 				default: 'thirdPartyAlerts',
 			},
 			...thirdPartyAlertsDescription,
 			...firstPartyAlertsDescription,
+			...firstPartyWatchlistDescription,
 			...researchDescription,
 			...endUserAlertsDescription,
+			...endUserWatchlistDescription,
+			...thirdPartyWatchlistDescription,
+			...assessmentsResourceDescription,
 		],
 	};
 
@@ -251,9 +301,12 @@ export class HackNotice implements INodeType {
 
 		const allowedOperationsByResource: Record<string, string[]> = {
 			thirdPartyAlerts: ['getThirdPartyAlerts'],
+			thirdPartyWatchlist: ['deleteById', 'getById', 'getWatchlistDomains', 'searchDomain', 'updateById'],
 			firstPartyAlerts: ['getFirstPartyAlerts'],
+			firstPartyWatchlist: ['createItem', 'deleteById', 'getById', 'getWatchlistItems', 'searchItem'],
 			research: ['getPhraseAlerts', 'getWordpoolAlerts'],
 			endUserAlerts: ['getEndUserAlerts'],
+			endUserWatchlist: ['addItemToWatchlist', 'deleteById', 'getAll', 'getById', 'searchForEmail'],
 		};
 
 		const endpointByResource: Record<string, string> = {
@@ -352,6 +405,348 @@ export class HackNotice implements INodeType {
 			try {
 				const resource = this.getNodeParameter('resource', i) as string;
 				const operation = this.getNodeParameter('operation', i) as string;
+
+				if (HACKNOTICE_ASSESSMENT_RESOURCES_SET.has(resource)) {
+					const rows = await executeHackNoticeAssessmentItem(
+						this,
+						i,
+						baseUrl,
+						resource as AssessmentResourceKey,
+						operation,
+					);
+					returnData.push(...rows);
+					continue;
+				}
+
+				if (resource === 'thirdPartyWatchlist') {
+					let url: string;
+					let method: 'DELETE' | 'GET' | 'POST' | 'PUT' = 'POST';
+					let headers: IDataObject | undefined;
+					let body: URLSearchParams | IDataObject | undefined;
+
+					if (operation === 'getWatchlistDomains') {
+						const pageNum = this.getNodeParameter('thirdPartyWatchlistPage', i, 0) as number;
+						if (!Number.isFinite(pageNum) || pageNum < 0) {
+							throw new NodeOperationError(this.getNode(), 'Page Number must be a non-negative integer', {
+								itemIndex: i,
+							});
+						}
+						const sort = this.getNodeParameter('thirdPartyWatchlistSort', i, 'alphadomain') as string;
+						url = `${baseUrl}/hackwatchlist/page/${Math.floor(pageNum)}`;
+						body = new URLSearchParams();
+						body.set('sort', sort);
+						headers = {
+							'Content-Type': 'application/x-www-form-urlencoded',
+						};
+					} else if (operation === 'searchDomain') {
+						const domain = String(this.getNodeParameter('thirdPartyWatchlistDomain', i, '')).trim();
+						if (!domain) {
+							throw new NodeOperationError(this.getNode(), 'Domain is required', {
+								itemIndex: i,
+							});
+						}
+						url = `${baseUrl}/hackwatchlist/search`;
+						body = new URLSearchParams();
+						body.set('term', domain);
+						headers = {
+							'Content-Type': 'application/x-www-form-urlencoded',
+						};
+					} else if (operation === 'getById' || operation === 'deleteById' || operation === 'updateById') {
+						const watchlistId = String(this.getNodeParameter('thirdPartyWatchlistId', i, '')).trim();
+						if (!watchlistId) {
+							throw new NodeOperationError(this.getNode(), 'Watchlist ID is required', {
+								itemIndex: i,
+							});
+						}
+
+						url = `${baseUrl}/hackwatchlist/${encodeURIComponent(watchlistId)}`;
+
+						if (operation === 'getById') {
+							method = 'GET';
+						} else if (operation === 'deleteById') {
+							method = 'DELETE';
+						} else {
+							method = 'PUT';
+							const rawTags = this.getNodeParameter('thirdPartyWatchlistTags', i, []) as unknown;
+							let tags: unknown = rawTags;
+							if (typeof rawTags === 'string') {
+								try {
+									tags = JSON.parse(rawTags) as unknown;
+								} catch {
+									throw new NodeOperationError(this.getNode(), 'Tags must be a valid JSON array', {
+										itemIndex: i,
+									});
+								}
+							}
+
+							if (!Array.isArray(tags)) {
+								throw new NodeOperationError(this.getNode(), 'Tags must be a JSON array', {
+									itemIndex: i,
+								});
+							}
+
+							body = { tags };
+							headers = {
+								'Content-Type': 'application/json',
+							};
+						}
+					} else {
+						throw new NodeOperationError(this.getNode(), `Unsupported operation: ${operation}`, {
+							itemIndex: i,
+						});
+					}
+
+					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
+						method,
+						url,
+						headers,
+						body,
+						json: operation === 'updateById',
+					});
+
+					let parsedResponse = response as unknown;
+					if (typeof response === 'string') {
+						try {
+							parsedResponse = JSON.parse(response) as unknown;
+						} catch {
+							parsedResponse = { value: response };
+						}
+					}
+
+					const watchlistItems = extractItems(parsedResponse).map((item) =>
+						item && typeof item === 'object' ? (item as IDataObject) : ({ value: item } as IDataObject),
+					);
+					const jsonArray = this.helpers.returnJsonArray(watchlistItems) as INodeExecutionData[];
+					for (const data of jsonArray) {
+						data.pairedItem = { item: i };
+						returnData.push(data);
+					}
+					continue;
+				}
+
+				if (resource === 'firstPartyWatchlist') {
+					let url: string;
+					let method: 'DELETE' | 'GET' | 'POST' = 'POST';
+					let headers: IDataObject | undefined;
+					let body: URLSearchParams | IDataObject | undefined;
+
+					const parseJsonParameter = (raw: unknown, fieldName: string): IDataObject => {
+						if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+							return raw as IDataObject;
+						}
+						if (typeof raw !== 'string' || raw.trim() === '') {
+							return {};
+						}
+						try {
+							const parsed = JSON.parse(raw) as unknown;
+							if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+								return parsed as IDataObject;
+							}
+						} catch {
+							throw new NodeOperationError(this.getNode(), `${fieldName} must be valid JSON`, {
+								itemIndex: i,
+							});
+						}
+						throw new NodeOperationError(this.getNode(), `${fieldName} must be a JSON object`, {
+							itemIndex: i,
+						});
+					};
+
+					if (operation === 'getWatchlistItems') {
+						const pageNum = this.getNodeParameter('firstPartyWatchlistPage', i, 0) as number;
+						if (!Number.isFinite(pageNum) || pageNum < 0) {
+							throw new NodeOperationError(this.getNode(), 'Page Number must be a non-negative integer', {
+								itemIndex: i,
+							});
+						}
+						url = `${baseUrl}/domainwatchlist/page/${Math.floor(pageNum)}`;
+						body = parseJsonParameter(
+							this.getNodeParameter('firstPartyWatchlistRequestBody', i, {}),
+							'Request Body',
+						);
+						headers = {
+							'Content-Type': 'application/json',
+						};
+					} else if (operation === 'searchItem') {
+						const domain = String(this.getNodeParameter('firstPartyWatchlistDomain', i, '')).trim();
+						if (!domain) {
+							throw new NodeOperationError(this.getNode(), 'Domain is required', {
+								itemIndex: i,
+							});
+						}
+						url = `${baseUrl}/domainwatchlist/search`;
+						body = {
+							...parseJsonParameter(
+								this.getNodeParameter('firstPartyWatchlistSearchOptions', i, {}),
+								'Search Options',
+							),
+							term: domain,
+						};
+						headers = {
+							'Content-Type': 'application/json',
+						};
+					} else if (operation === 'createItem') {
+						const domain = String(this.getNodeParameter('firstPartyWatchlistDomain', i, '')).trim();
+						if (!domain) {
+							throw new NodeOperationError(this.getNode(), 'Domain is required', {
+								itemIndex: i,
+							});
+						}
+						url = `${baseUrl}/domainwatchlist/create`;
+						body = new URLSearchParams();
+						body.set('domain', domain);
+						headers = {
+							'Content-Type': 'application/x-www-form-urlencoded',
+						};
+					} else if (operation === 'getById' || operation === 'deleteById') {
+						const watchlistId = String(this.getNodeParameter('firstPartyWatchlistId', i, '')).trim();
+						if (!watchlistId) {
+							throw new NodeOperationError(this.getNode(), 'Watchlist ID is required', {
+								itemIndex: i,
+							});
+						}
+						method = operation === 'getById' ? 'GET' : 'DELETE';
+						url = `${baseUrl}/domainwatchlist/${encodeURIComponent(watchlistId)}`;
+					} else {
+						throw new NodeOperationError(this.getNode(), `Unsupported operation: ${operation}`, {
+							itemIndex: i,
+						});
+					}
+
+					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
+						method,
+						url,
+						headers,
+						body,
+						json: !(body instanceof URLSearchParams),
+					});
+
+					let parsedResponse = response as unknown;
+					if (typeof response === 'string') {
+						try {
+							parsedResponse = JSON.parse(response) as unknown;
+						} catch {
+							parsedResponse = { value: response };
+						}
+					}
+
+					const watchlistItems = extractItems(parsedResponse).map((item) =>
+						item && typeof item === 'object' ? (item as IDataObject) : ({ value: item } as IDataObject),
+					);
+					const jsonArray = this.helpers.returnJsonArray(watchlistItems) as INodeExecutionData[];
+					for (const data of jsonArray) {
+						data.pairedItem = { item: i };
+						returnData.push(data);
+					}
+					continue;
+				}
+
+				if (resource === 'endUserWatchlist') {
+					let url: string;
+					let method: 'DELETE' | 'GET' | 'POST' = 'POST';
+					let headers: IDataObject | undefined;
+					let body: URLSearchParams | IDataObject | undefined;
+
+					const parseTagsArray = (raw: unknown): unknown[] => {
+						if (Array.isArray(raw)) return raw;
+						if (typeof raw !== 'string' || raw.trim() === '') return [];
+						try {
+							const parsed = JSON.parse(raw) as unknown;
+							if (Array.isArray(parsed)) return parsed;
+						} catch {
+							throw new NodeOperationError(this.getNode(), 'Tags must be a valid JSON array', {
+								itemIndex: i,
+							});
+						}
+						throw new NodeOperationError(this.getNode(), 'Tags must be a JSON array', {
+							itemIndex: i,
+						});
+					};
+
+					if (operation === 'getAll') {
+						const pageNum = this.getNodeParameter('endUserWatchlistPage', i, 0) as number;
+						if (!Number.isFinite(pageNum) || pageNum < 0) {
+							throw new NodeOperationError(this.getNode(), 'Page Number must be a non-negative integer', {
+								itemIndex: i,
+							});
+						}
+						method = 'GET';
+						url = `${baseUrl}/enduserwatchlist/page/${Math.floor(pageNum)}`;
+					} else if (operation === 'searchForEmail') {
+						const email = String(this.getNodeParameter('endUserWatchlistEmail', i, '')).trim();
+						if (!email) {
+							throw new NodeOperationError(this.getNode(), 'Email or Hash is required', {
+								itemIndex: i,
+							});
+						}
+						url = `${baseUrl}/enduserwatchlist/search`;
+						body = new URLSearchParams();
+						body.set('term', email);
+						headers = {
+							'Content-Type': 'application/x-www-form-urlencoded',
+						};
+					} else if (operation === 'addItemToWatchlist') {
+						const email = String(this.getNodeParameter('endUserWatchlistEmail', i, '')).trim();
+						if (!email) {
+							throw new NodeOperationError(this.getNode(), 'Email or Hash is required', {
+								itemIndex: i,
+							});
+						}
+						const tags = parseTagsArray(this.getNodeParameter('endUserWatchlistTags', i, []));
+						const hashed = this.getNodeParameter('endUserWatchlistHashed', i, false) as boolean;
+						url = `${baseUrl}/enduserwatchlist/create`;
+						body = {
+							email,
+							tags,
+						};
+						if (hashed) {
+							body.hashed = true;
+						}
+						headers = {
+							'Content-Type': 'application/json',
+						};
+					} else if (operation === 'getById' || operation === 'deleteById') {
+						const watchlistId = String(this.getNodeParameter('endUserWatchlistId', i, '')).trim();
+						if (!watchlistId) {
+							throw new NodeOperationError(this.getNode(), 'Watchlist ID is required', {
+								itemIndex: i,
+							});
+						}
+						method = operation === 'getById' ? 'GET' : 'DELETE';
+						url = `${baseUrl}/enduserwatchlist/${encodeURIComponent(watchlistId)}`;
+					} else {
+						throw new NodeOperationError(this.getNode(), `Unsupported operation: ${operation}`, {
+							itemIndex: i,
+						});
+					}
+
+					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'hackNoticeApi', {
+						method,
+						url,
+						headers,
+						body,
+						json: !(body instanceof URLSearchParams),
+					});
+
+					let parsedResponse = response as unknown;
+					if (typeof response === 'string') {
+						try {
+							parsedResponse = JSON.parse(response) as unknown;
+						} catch {
+							parsedResponse = { value: response };
+						}
+					}
+
+					const watchlistItems = extractItems(parsedResponse).map((item) =>
+						item && typeof item === 'object' ? (item as IDataObject) : ({ value: item } as IDataObject),
+					);
+					const jsonArray = this.helpers.returnJsonArray(watchlistItems) as INodeExecutionData[];
+					for (const data of jsonArray) {
+						data.pairedItem = { item: i };
+						returnData.push(data);
+					}
+					continue;
+				}
 
 				const allowedOps = allowedOperationsByResource[resource] ?? [];
 				if (!allowedOps.includes(operation)) {

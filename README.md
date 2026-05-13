@@ -49,6 +49,15 @@ API reference: [HackNotice API (Postman)](https://documenter.getpostman.com/view
 
 Compatible with n8n@1.60.0 or later
 
+## MCP + AI Agent Best Practices
+
+When using the `HackNotice MCP` node with AI Agents, apply these guardrails early:
+
+- Enable **Fail on MCP Tool Error** so tool failures (`isError=true`, including timeout-style failures surfaced by the MCP server) trigger n8n Error Workflows.
+- Configure an n8n [Error Workflow](https://docs.n8n.io/flow-logic/error-handling/) to alert, log, or run recovery steps when a tool call fails.
+- Test each MCP tool in isolation first: use a `Manual Trigger` + `HackNotice MCP` node with hardcoded `Tool Name` and `Arguments (JSON)` before connecting an AI Agent node.
+- Watch execution logs for unusually high call counts and token usage patterns; repeated loops usually mean tool descriptions overlap or agent instructions are too vague.
+
 ## Resources
 
 * [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)

@@ -1,7 +1,7 @@
 {
         "name": "n8n-nodes-hacknotice-api",
-        "version": "1.0.19",
-        "description": "Fetch HackNotice alerts, saved searches, and assessment resources for n8n workflows.",
+        "version": "1.1.0",
+        "description": "Fetch HackNotice alerts, saved searches, and call HackNotice MCP tools from n8n workflows.",
         "license": "MIT",
         "homepage": "https://github.com/HackNotice/n8n-nodes-hacknotice#readme",
         "bugs": {
@@ -36,10 +36,12 @@
                 "n8nNodesApiVersion": 1,
                 "strict": true,
                 "credentials": [
-                        "dist/credentials/HackNoticeApi.credentials.js"
+                        "dist/credentials/HackNoticeApi.credentials.js",
+                        "dist/credentials/HackNoticeMcpApi.credentials.js"
                 ],
                 "nodes": [
-                        "dist/nodes/HackNotice/HackNotice.node.js"
+                        "dist/nodes/HackNotice/HackNotice.node.js",
+                        "dist/nodes/HackNoticeMcp/HackNoticeMcp.node.js"
                 ]
         },
         "devDependencies": {
@@ -64,5 +66,8 @@
                 "github": {
                         "release": true
                 }
+        },
+        "dependencies": {
+                "dotenv": "^17.4.2"
         }
 }

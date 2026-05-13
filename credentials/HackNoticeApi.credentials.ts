@@ -8,6 +8,8 @@ import type {
 
 const AUTH_SIGN_IN_PATH = '/auth/sign_in';
 const API_BASE_URL = 'https://extensionapi.hacknotice.com';
+const AUTH_METHOD_API_KEY = 'apiKeyEmailPassword';
+const AUTH_METHOD_INTEGRATION_KEY = 'integrationKey';
 
 export class HackNoticeApi implements ICredentialType {
 	name = 'hackNoticeApi';
@@ -19,21 +21,47 @@ export class HackNoticeApi implements ICredentialType {
 	documentationUrl = 'https://documenter.getpostman.com/view/806684/RWaHzA6C';
 
 	properties: INodeProperties[] = [
-		// API Key
+		{
+			displayName: 'Authentication Method',
+			name: 'authenticationMethod',
+			type: 'options',
+			default: AUTH_METHOD_API_KEY,
+			options: [
+				{
+					name: 'API Key + Email + Password',
+					value: AUTH_METHOD_API_KEY,
+				},
+				{
+					name: 'Integration Key',
+					value: AUTH_METHOD_INTEGRATION_KEY,
+				},
+			],
+			description:
+				'Choose the HackNotice authentication flow to use for all API requests made by this credential.',
+		},
 		{
 			displayName: 'API Key',
 			name: 'apiKey',
 			type: 'string',
 			typeOptions: { password: true },
 			default: '',
+			displayOptions: {
+				show: {
+					authenticationMethod: [AUTH_METHOD_API_KEY],
+				},
+			},
 		},
-		// Email & Password
 		{
 			displayName: 'Email',
 			name: 'email',
 			type: 'string',
 			placeholder: 'name@example.com',
 			default: '',
+			displayOptions: {
+				show: {
+					authenticationMethod: [AUTH_METHOD_API_KEY],
+				},
+			},
 		},
 		{
 			displayName: 'Password',
@@ -41,11 +69,30 @@ export class HackNoticeApi implements ICredentialType {
 			type: 'string',
 			typeOptions: { password: true },
 			default: '',
+			displayOptions: {
+				show: {
+					authenticationMethod: [AUTH_METHOD_API_KEY],
+				},
+			},
+		},
+		{
+			displayName: 'Integration Key',
+			name: 'integrationKey',
+			type: 'string',
+			typeOptions: { password: true },
+			default: '',
+			description:
+				'Per-user HackNotice integration secret. Sent as the X-HackNotice-Integration-Key header on every API request.',
+			displayOptions: {
+				show: {
+					authenticationMethod: [AUTH_METHOD_INTEGRATION_KEY],
+				},
+			},
 		},
 	];
 
 	authenticate: IAuthenticate = async (credentials, requestOptions) => {
-		const buildAndLogFinalOptions = (headers: Record<string, string>) => {
+		const buildFinalOptions = (headers: Record<string, string>) => {
 			const finalOptions = {
 				...requestOptions,
 				headers: {
@@ -56,6 +103,23 @@ export class HackNoticeApi implements ICredentialType {
 
 			return finalOptions;
 		};
+
+		const credentialData = credentials as unknown as Record<string, unknown>;
+		const authenticationMethod = String(
+			credentialData.authenticationMethod ??
+				(credentialData.integrationKey ? AUTH_METHOD_INTEGRATION_KEY : AUTH_METHOD_API_KEY),
+		);
+
+		if (authenticationMethod === AUTH_METHOD_INTEGRATION_KEY) {
+			const integrationKey = String(credentialData.integrationKey ?? '').trim();
+			if (!integrationKey) {
+				throw new Error('Integration Key is required for HackNotice API');
+			}
+
+			return buildFinalOptions({
+				'X-HackNotice-Integration-Key': integrationKey,
+			});
+		}
 
 		// n8n passes credential fields by the `name` property.
 		// Keep a small fallback for legacy/renamed fields to avoid hard failures.
@@ -74,8 +138,8 @@ export class HackNoticeApi implements ICredentialType {
 		const apiKey = String(apiKeyRaw ?? '').trim();
 		if (!apiKey) {
 			// Don't log the secret itself; log which keys exist and whether the apiKey is non-empty.
-			const credentialKeys = Object.keys(credentials as unknown as Record<string, unknown>);
-			const emailPresent = Boolean((credentials as unknown as Record<string, unknown>)?.email);
+			const credentialKeys = Object.keys(credentialData);
+			const emailPresent = Boolean(credentialData.email);
 			const apiKeyFromRequestPresent = Boolean(apiKeyFromRequest);
 			throw new Error(
 				`API Key is required (credentialKeys=[${credentialKeys.join(',')}], emailPresent=${String(
@@ -85,8 +149,8 @@ export class HackNoticeApi implements ICredentialType {
 		}
 
 		// JWT token is obtained via the sign-in endpoint.
-		const email = (credentials as unknown as Record<string, unknown>)?.email as string;
-		const password = (credentials as unknown as Record<string, unknown>)?.password as string;
+		const email = credentialData.email as string;
+		const password = credentialData.password as string;
 		if (!email || !password) throw new Error('Email and Password are required to obtain the JWT token');
 
 		const signInUrl = `${API_BASE_URL}${AUTH_SIGN_IN_PATH}`;
@@ -127,7 +191,7 @@ export class HackNoticeApi implements ICredentialType {
 		const token = data?.token;
 		if (!token) throw new Error('HackNotice sign-in response did not contain a token');
 
-		return buildAndLogFinalOptions({
+		return buildFinalOptions({
 			apikey: apiKey,
 			Authorization: `JWT ${token}`,
 		});
