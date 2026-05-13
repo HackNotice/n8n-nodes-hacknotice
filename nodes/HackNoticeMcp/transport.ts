@@ -32,9 +32,13 @@ import type {
 	ILoadOptionsFunctions,
 } from 'n8n-workflow';
 
+import { HACKNOTICE_MCP_ENDPOINT_URL } from './constants';
+
 const MCP_PROTOCOL_VERSION = '2024-11-05';
 const SESSION_HEADER = 'mcp-session-id';
 const CREDENTIAL_NAME = 'hackNoticeMcpApi';
+/** MCP calls can be slow (many tools / cold prod-api); avoid n8n default short timeouts. */
+const MCP_HTTP_TIMEOUT_MS = 120_000;
 
 /** JSON-RPC 2.0 success/error envelopes (subset we actually use). */
 export interface JsonRpcError {
@@ -137,24 +141,20 @@ function readHeader(headers: unknown, name: string): string | undefined {
 export class McpStreamableHttpClient {
 	private sessionId: string | undefined;
 	private nextId = 1;
-	private endpointUrl = '';
+	private readonly endpointUrl = HACKNOTICE_MCP_ENDPOINT_URL;
 
 	constructor(private readonly ctx: RequestCapableContext) {}
 
 	/** Issues `initialize` + `notifications/initialized`. Returns server info. */
 	async open(): Promise<{ serverInfo?: Record<string, unknown> }> {
-		const credentials = await this.ctx.getCredentials(CREDENTIAL_NAME);
-		const url = String((credentials as Record<string, unknown>)?.endpointUrl ?? '').trim();
-		if (!url) {
-			throw new Error('HackNotice MCP credential is missing the endpoint URL.');
-		}
-		this.endpointUrl = url;
+		// Ensure credential exists (integration key) before first MCP request.
+		await this.ctx.getCredentials(CREDENTIAL_NAME);
 
 		const id = this.nextId++;
 		const initParams = {
 			protocolVersion: MCP_PROTOCOL_VERSION,
 			capabilities: {},
-			clientInfo: { name: 'n8n-nodes-hacknotice-mcp', version: '1.1.0' },
+			clientInfo: { name: 'n8n-nodes-hacknotice-mcp', version: '2.0.0' },
 		};
 
 		const { envelope, sessionId } = await this.post(id, 'initialize', initParams);
@@ -209,6 +209,7 @@ export class McpStreamableHttpClient {
 				returnFullResponse: true,
 				ignoreHttpStatusErrors: true,
 				json: false,
+				timeout: MCP_HTTP_TIMEOUT_MS,
 			});
 		} catch {
 			// Intentional: see method JSDoc.
@@ -228,12 +229,15 @@ export class McpStreamableHttpClient {
 		};
 		if (this.sessionId) headers[SESSION_HEADER] = this.sessionId;
 
+		const payload = JSON.stringify({ jsonrpc: '2.0', method, params });
+
 		await this.ctx.helpers.httpRequestWithAuthentication.call(this.ctx, CREDENTIAL_NAME, {
 			method: 'POST' as IHttpRequestMethods,
 			url: this.endpointUrl,
-			body: { jsonrpc: '2.0', method, params },
+			body: payload,
 			headers,
-			json: true,
+			json: false,
+			timeout: MCP_HTTP_TIMEOUT_MS,
 			returnFullResponse: true,
 			ignoreHttpStatusErrors: true,
 		});
@@ -254,16 +258,21 @@ export class McpStreamableHttpClient {
 		};
 		if (this.sessionId) headers[SESSION_HEADER] = this.sessionId;
 
+		// Must send a real JSON string: with `json: false`, a plain object body is not
+		// reliably serialized by n8n's HTTP helper, which can produce an empty/malformed
+		// POST body and cause the server or proxy to drop the connection.
+		const payload = JSON.stringify({ jsonrpc: '2.0', id, method, params });
+
 		const response = (await this.ctx.helpers.httpRequestWithAuthentication.call(
 			this.ctx,
 			CREDENTIAL_NAME,
 			{
 				method: 'POST' as IHttpRequestMethods,
 				url: this.endpointUrl,
-				body: { jsonrpc: '2.0', id, method, params },
+				body: payload,
 				headers,
-				// Keep raw body so we can detect SSE vs JSON ourselves.
 				json: false,
+				timeout: MCP_HTTP_TIMEOUT_MS,
 				returnFullResponse: true,
 				ignoreHttpStatusErrors: true,
 			},
