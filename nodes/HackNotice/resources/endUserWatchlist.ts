@@ -21,13 +21,13 @@ export const endUserWatchlistDescription: INodeProperties[] = [
 				description: 'Add an email or hash to the end user watchlist',
 			},
 			{
-				name: 'Delete By ID',
+				name: 'Delete by ID',
 				value: 'deleteById',
 				action: 'Delete by ID',
 				description: 'Delete an end user watchlist item by document ID',
 			},
 			{
-				name: 'Get By ID',
+				name: 'Get by ID',
 				value: 'getById',
 				action: 'Get by ID',
 				description: 'Get an end user watchlist item by document ID',

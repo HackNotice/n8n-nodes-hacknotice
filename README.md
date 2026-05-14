@@ -1,6 +1,6 @@
 # n8n-nodes-hacknotice
 
-This is an n8n community node for [HackNotice](https://hacknotice.com/). It lets you fetch third-party, first-party, end-user, and research alerts in your n8n workflows.
+This is an n8n community node for [HackNotice](https://hacknotice.com/). It exposes the **HackNotice** node so you can call the HackNotice extensions API from workflows: third-party, first-party, and end-user alerts; research alerts; first-party, third-party, and end-user watchlists; and the assessments API family.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
 
@@ -8,55 +8,77 @@ This is an n8n community node for [HackNotice](https://hacknotice.com/). It lets
 
 Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
 
+## Published surface
+
+| Item | Name in n8n | Notes |
+|------|-------------|--------|
+| Node | **HackNotice** | Single regular node; pick a **Resource**, then an **Operation**. |
+| Credential | **HackNotice API** | Two authentication methods (see [Credentials](#credentials)). |
+
 ## Operations
 
-- **Third Party Alerts**
-  - Get Third Party Alerts
+### Alerts and research
 
-- **First Party Alerts**
-  - Get Many First Party Alerts
+- **Third Party Alert** — Get Third Party Alerts  
+- **First Party Alert** — Get Many First Party Alerts  
+- **End User** — Get End User Alerts  
+- **Research** — Get Phrase Alerts; Get Wordpool Alerts  
 
-- **End User Alerts**
-  - Get End User Alerts
+For the alert resources above, you can optionally select a **saved search**, and use **Limit by Time**: `Last Day`, `Last Week`, `Last Month`.
 
-- **Research**
-  - Get Phrase Alerts
-  - Get Wordpool Alerts
+### Watchlists
 
-All alert operations support:
-- Saved search selection (optional)
-- Limit By Time: `Last Day`, `Last Week`, `Last Month`
+- **Third Party Watchlist** — Delete by ID; Get by ID; Get Watchlist Domains; Search Domain; Update by ID  
+- **First Party Watchlist** — Create Item; Delete by ID; Get by ID; Get Watchlist Items; Search Item  
+- **End User Watchlist** — Add Item to Watchlist; Delete by ID; Get by ID; Get Many; Search for Email  
+
+### Assessments (extension API)
+
+Choose one of these **resources**, then pick an **operation** (each operation’s description in the node shows the HTTP method and path):
+
+- **Assessment** — Get Assessment Invite; Update Assessment Invite; List Assessments (Page); Count Assessments; Create Assessment; Get Assessment; Projection Assessments; Delete Assessment; Update Assessment  
+- **Assessment Event** — Invited — List Events (Page); Invited — Create Event; Invited — Get Event; Invited — Delete Event; Invited — Update Event; List Events (Page); Count Events; Create Event; Get Event; Delete Event; Update Event  
+- **Assessment Template** — List Templates (Page); List Template Frameworks; Count Templates; Create Template; Get Template; Delete Template; Update Template  
+- **Assessment Preference** — Create Preferences; Get Preferences; Delete Preferences; Update Preferences  
+- **Assessment Invite** — List Invites (Page); Count Invites; Create Invite; Get Invite; List My Invites; Get Invite by Code; Activate Invite; Delete Invite; Update Invite  
+- **Assessment Data File** — List Files (Page); Count Files; Get File Metadata; Update File Metadata; Download File; Delete File  
+- **Assessment Data File (Invited)** — Upload File (Invited); List Files (Page, Invited); Count Files (Invited); Get File Metadata (Invited); Download File (Invited); Delete File (Invited)  
+
+Assessment calls use shared fields such as **Document ID**, **Page Number**, **Invite Code**, and **Request Body** (JSON) where the API expects them; invited file upload uses the multipart fields shown in the node.
 
 ## Credentials
 
-Use the **HackNotice API** credential.
+Use the **HackNotice API** credential. Base URL for API traffic is `https://extensionapi.hacknotice.com`.
 
-### API Key
-- **API Key** – Your HackNotice API key.
-- **API Base URL** – Fixed to `https://extensionapi.hacknotice.com`.
+### API Key + Email + Password
 
-### Email & Password (used to obtain JWT)
-- **Email** – Your HackNotice account email.
-- **Password** – Your HackNotice account password.
+- **API Key** — Your HackNotice API key (sent as the `apikey` header).  
+- **Email** / **Password** — Used once per request flow to obtain a JWT via `POST /auth/sign_in`.  
 
-The node automatically signs in to obtain a JWT, then sends both headers on every API request:
-- `apikey: <your apiKey>`
-- `Authorization: JWT <token>`
+Successful requests send:
+
+- `apikey: <your API key>`  
+- `Authorization: JWT <token>`  
+
+### Integration Key
+
+- **Integration Key** — Per-user integration secret from HackNotice.  
+
+Requests send:
+
+- `X-HackNotice-Integration-Key: <your integration key>`  
+
+No email/password or JWT is used for this method.
 
 API reference: [HackNotice API (Postman)](https://documenter.getpostman.com/view/806684/RWaHzA6C)
 
 ## Compatibility
 
-Compatible with n8n@1.60.0 or later
+Compatible with n8n@1.60.0 or later.
 
-## MCP + AI Agent Best Practices
+## MCP and AI agents (separate package)
 
-When using the `HackNotice MCP` node with AI Agents, apply these guardrails early:
-
-- Enable **Fail on MCP Tool Error** so tool failures (`isError=true`, including timeout-style failures surfaced by the MCP server) trigger n8n Error Workflows.
-- Configure an n8n [Error Workflow](https://docs.n8n.io/flow-logic/error-handling/) to alert, log, or run recovery steps when a tool call fails.
-- Test each MCP tool in isolation first: use a `Manual Trigger` + `HackNotice MCP` node with hardcoded `Tool Name` and `Arguments (JSON)` before connecting an AI Agent node.
-- Watch execution logs for unusually high call counts and token usage patterns; repeated loops usually mean tool descriptions overlap or agent instructions are too vague.
+n8n’s [community node verification rules](https://docs.n8n.io/integrations/creating-nodes/build/reference/verification-guidelines/#node-types) allow only **one** regular node per package. MCP client workflows are therefore shipped as a **separate** npm package: [`n8n-nodes-hacknotice-mcp`](https://www.npmjs.com/package/n8n-nodes-hacknotice-mcp) (repository: [github.com/HackNotice/n8n-nodes-hacknotice-mcp](https://github.com/HackNotice/n8n-nodes-hacknotice-mcp)). Install that package for the MCP-oriented node and credential; its README documents install steps, credential fields, and tool exposure. This repo remains the REST-oriented **HackNotice** node only.
 
 ## Resources
 

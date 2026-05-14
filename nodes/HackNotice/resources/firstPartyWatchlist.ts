@@ -21,13 +21,13 @@ export const firstPartyWatchlistDescription: INodeProperties[] = [
 				description: 'Add a domain to the first-party watchlist',
 			},
 			{
-				name: 'Delete By ID',
+				name: 'Delete by ID',
 				value: 'deleteById',
 				action: 'Delete by ID',
 				description: 'Delete a first-party watchlist item by document ID',
 			},
 			{
-				name: 'Get By ID',
+				name: 'Get by ID',
 				value: 'getById',
 				action: 'Get by ID',
 				description: 'Get a first-party watchlist item by document ID',

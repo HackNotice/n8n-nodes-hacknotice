@@ -15,13 +15,13 @@ export const thirdPartyWatchlistDescription: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Delete By ID',
+				name: 'Delete by ID',
 				value: 'deleteById',
 				action: 'Delete by ID',
 				description: 'Delete a third-party watchlist domain by document ID',
 			},
 			{
-				name: 'Get By ID',
+				name: 'Get by ID',
 				value: 'getById',
 				action: 'Get by ID',
 				description: 'Get a third-party watchlist domain by document ID',
@@ -39,7 +39,7 @@ export const thirdPartyWatchlistDescription: INodeProperties[] = [
 				description: 'Search the third-party watchlist for a domain',
 			},
 			{
-				name: 'Update By ID',
+				name: 'Update by ID',
 				value: 'updateById',
 				action: 'Update by ID',
 				description: 'Update third-party watchlist domain tags by document ID',
